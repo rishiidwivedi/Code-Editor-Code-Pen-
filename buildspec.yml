@@ -1,0 +1,35 @@
+version: 0.2
+
+env:
+  variables:
+    EC2_USER: "ec2-user"
+    EC2_HOST: "your-ec2-public-ip"
+    APP_DIR: "/home/ec2-user/app"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo Installing dependencies...
+      - npm install
+      - echo Installing ssh client...
+      - yum install -y openssh-clients
+
+  build:
+    commands:
+      - echo Build phase completed
+
+  post_build:
+    commands:
+      - echo Deploying to EC2...
+      
+      # Add private key (stored in CodeBuild environment variable)
+      - echo "$SSH_PRIVATE_KEY" > key.pem
+      - chmod 400 key.pem
+      
+      # Copy files to EC2
+      - scp -o StrictHostKeyChecking=no -i key.pem -r * $EC2_USER@$EC2_HOST:$APP_DIR
+      
+      # Run commands on EC2
+      - ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "cd $APP_DIR && npm install && pm2 restart all || pm2 start app.js"
